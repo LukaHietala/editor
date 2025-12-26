@@ -3,6 +3,7 @@
 
 #define KEY_ESCAPE 27
 #define TAB_WIDTH  8
+#define PATH_MAX   4096 /* PATH_MAX from linux/limits.h*/
 
 enum editor_mode {
 	MODE_NORMAL,
@@ -10,31 +11,42 @@ enum editor_mode {
 };
 
 /*
- * Using doubly-linked lists as the main data structure for lines, same as GNU
- * Nano, due to its simplicity. Gap buffers and ropes are too complex and
- * unnecessary for small project like this. This method works well with small
- * files
+ * Using simple linked lists for lines, not fancy gap buffers like Emacs or
+ * ropes like VS Code
  */
 struct line {
 	char *data;
+	int size;
+	int capacity;
 	struct line *next;
 	struct line *prev;
 	int lineno;
 };
 
 struct editor {
-	struct line *head; /* First line */
-	struct line *tail; /* Last line */
-	struct line *current; /* Line that cursor is on */
+	/*
+	 * TODO: Create buffer system
+	 */
+	struct line *head;
+	struct line *tail;
+	struct line *current;
 
-	int cx, cy; /* Cursor coords, cy for easy lineno */
+	/*
+	 * Cursor coords
+	 */
+	int cx, cy;
 	/*
 	 * Offsets for rendering
 	 */
 	int row_offset;
 	int col_offset;
+	/*
+	 * Terminal properties
+	 */
+	int screen_rows; /* x, getmaxyx */
+	int screen_cols; /* y, getmaxyx */
 
-	char filename[256]; /* 256 is usual limit for file systems */
+	char path[PATH_MAX];
 	enum editor_mode mode;
 };
 
