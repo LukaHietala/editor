@@ -85,6 +85,40 @@ static void load_file(struct editor *e, const char *path)
 	e->cy = 0;
 }
 
+static void save_file(struct editor *e)
+{
+	if (!e->path[0]) {
+		/* TODO: Handle "No Name" files later */
+		return;
+	}
+
+	FILE *f = fopen(e->path, "w");
+	if (!f) {
+		/* Failed to open file (permissions, etc) */
+		/* TODO: ADD WAY TO SEND MESSAGES TO STATUSBAR */
+		return;
+	}
+
+	struct line *curr = e->head;
+	while (curr) {
+		if (curr->data)
+			fprintf(f, "%s", curr->data);
+
+		/* * Write a newline
+		 * Note: load_file strips newlines, so we MUST restore them
+		 * fprintf(..., "\n") ensures POSIX compliant line ending,
+		 * LF. If file had CRLF file endings (Windows), the they will be
+		 * converted to LF. This is intentional for now. Maybe something
+		 * like FORMAT enum on editor should be added, so they would't change?
+		 */
+		fprintf(f, "\n");
+
+		curr = curr->next;
+	}
+
+	fclose(f);
+}
+
 /* Converts real mouse pos to rendered mouse pos */
 static int cx_to_rx(struct line *line, int cx)
 {
@@ -274,6 +308,9 @@ static void handle_input(struct editor *e)
 			break;
 		case 'q':
 			quit_editor(e, 0);
+			break;
+		case 'w':
+			save_file(e);
 			break;
 		case KEY_UP:
 		case KEY_DOWN:
