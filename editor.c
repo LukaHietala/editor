@@ -192,11 +192,45 @@ static void move_cursor(struct editor *e, int key)
 		break;
 	case KEY_DOWN:
 	case 'j':
-	case KEY_RETURN:
+	case KEY_RETURN: /* Keycode 10 and 13 */
 		if (e->current->next) {
 			e->cy++;
 			e->current = e->current->next;
 		}
+		break;
+	case KEY_PPAGE: /* Page up */
+		/* Move up by the number of rows visible on screen, -1 due to
+		 * status bar taking one space, TODO: optimize, use lineos */
+		for (int i = 0; i < e->screen_rows - 1; i++) {
+			if (e->current->prev) {
+				e->cy--;
+				e->current = e->current->prev;
+			}
+		}
+		break;
+	case KEY_NPAGE: /* Page down */
+		/* Move down by the number of rows visible on screen, -1 due to
+		 * status bar taking one space, TODO: optimize, use linenos */
+		for (int i = 0; i < e->screen_rows - 1; i++) {
+			if (e->current->next) {
+				e->cy++;
+				e->current = e->current->next;
+			}
+		}
+		break;
+	case 'g': /* Jump to head */
+		/* Check for the second 'g' */
+		if (getch() == 'g') {
+			e->current = e->head;
+			e->cy = 0;
+			e->cx = 0;
+		}
+		break;
+
+	case 'G': /* Jump to tail */
+		e->current = e->tail;
+		e->cy = e->line_count - 1;
+		e->cx = 0;
 		break;
 	}
 
@@ -249,7 +283,13 @@ static void handle_input(struct editor *e)
 		case 'j':
 		case 'k':
 		case 'l':
+		/* gg - Jump to head */
+		case 'g':
+		/* Jump to tail */
+		case 'G':
 		case KEY_RETURN:
+		case KEY_PPAGE:
+		case KEY_NPAGE:
 			move_cursor(e, c);
 			break;
 		}
@@ -262,6 +302,8 @@ static void handle_input(struct editor *e)
 		case KEY_DOWN:
 		case KEY_LEFT:
 		case KEY_RIGHT:
+		case KEY_PPAGE:
+		case KEY_NPAGE:
 			move_cursor(e, c);
 			break;
 		case KEY_BACKSPACE:
