@@ -31,6 +31,8 @@ struct editor {
 	struct line *tail;
 	struct line *current;
 
+	int line_count;
+
 	/*
 	 * Cursor coords
 	 */
