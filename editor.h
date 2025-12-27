@@ -1,9 +1,14 @@
 #ifndef EDITOR_H
 #define EDITOR_H
 
+#include <limits.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
 #define KEY_ESCAPE 27
 #define TAB_WIDTH  8
-#define PATH_MAX   4096 /* PATH_MAX from linux/limits.h*/
 
 enum editor_mode {
 	MODE_NORMAL,
