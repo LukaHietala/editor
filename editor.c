@@ -4,10 +4,10 @@
 #include <ncurses.h>
 #include "editor.h"
 
-/* Frees every line */
 static void free_editor(struct editor *e)
 {
 	struct line *curr = e->head;
+	/* Frees every line */
 	while (curr) {
 		struct line *next = curr->next;
 		if (curr->data)
@@ -205,6 +205,29 @@ static void move_cursor(struct editor *e, int key)
 		e->cx = row_len;
 }
 
+static void insert_char(struct editor *e, int c)
+{
+	struct line *l = e->current;
+
+	/* Check line capacity and grow it (*2) if necessary */
+	if (l->size >= l->capacity) {
+		l->capacity = (l->capacity == 0) ? 8 : l->capacity * 2;
+		l->data = realloc(l->data, l->capacity + 1);
+	}
+
+	/* Move text; if cursor is in middle, shift rest of line right,
+	 * memmove(dest, src, n) */
+	memmove(&l->data[e->cx + 1], &l->data[e->cx], l->size - e->cx);
+
+	/* Insert char and update size */
+	l->data[e->cx] = c;
+	l->size++;
+	l->data[l->size] = '\0';
+
+	/* Move cursor */
+	e->cx++;
+}
+
 static void handle_input(struct editor *e)
 {
 	int c = getch();
@@ -244,9 +267,8 @@ static void handle_input(struct editor *e)
 			/* TODO: Char deletion */
 			break;
 		default:
-			/* TODO: Char insertion */
-			if (c >= 32 && c <= 126) {
-			}
+			if (c >= 32 && c <= 126)
+				insert_char(e, c);
 			break;
 		}
 	}
@@ -272,7 +294,6 @@ static void handle_input(struct editor *e)
 		e->col_offset = rx - e->screen_cols + 1;
 }
 
-/* Creates ncurses window and configures it */
 static void init_ncurses()
 {
 	/* Initialise ncurses */
