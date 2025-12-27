@@ -1,8 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <ncurses.h>
 #include "editor.h"
+
+/* Sets status bar message */
+static void set_message(struct editor *e, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(e->message, sizeof(e->message), fmt, ap);
+	va_end(ap);
+}
 
 static void free_editor(struct editor *e)
 {
@@ -95,28 +105,35 @@ static void save_file(struct editor *e)
 	FILE *f = fopen(e->path, "w");
 	if (!f) {
 		/* Failed to open file (permissions, etc) */
-		/* TODO: ADD WAY TO SEND MESSAGES TO STATUSBAR */
+		set_message(e, "Err: %s", strerror(errno));
 		return;
 	}
 
 	struct line *curr = e->head;
+	long bytes_written = 0;
 	while (curr) {
-		if (curr->data)
+		if (curr->data) {
 			fprintf(f, "%s", curr->data);
+			bytes_written += curr->size;
+		}
 
 		/* * Write a newline
 		 * Note: load_file strips newlines, so we MUST restore them
 		 * fprintf(..., "\n") ensures POSIX compliant line ending,
 		 * LF. If file had CRLF file endings (Windows), the they will be
 		 * converted to LF. This is intentional for now. Maybe something
-		 * like FORMAT enum on editor should be added, so they would't change?
+		 * like FORMAT enum on editor should be added, so they would't
+		 * change?
 		 */
 		fprintf(f, "\n");
+		bytes_written++;
 
 		curr = curr->next;
 	}
 
 	fclose(f);
+	set_message(e, "\"%s\" %ldL, %ldB written", e->path, e->line_count,
+		    bytes_written);
 }
 
 /* Converts real mouse pos to rendered mouse pos */
@@ -138,21 +155,29 @@ static int cx_to_rx(struct line *line, int cx)
 static void draw_status_bar(struct editor *e)
 {
 	attron(A_REVERSE);
+	int width = e->screen_cols;
 
-	/*
-	 * Very much like neovim's but on one line
-	 * [NORMAL] | <path> | L: <current_line>/<last_line> C:
-	 * <cursor_x>-<rendered_x>
-	 */
-	mvprintw(e->screen_rows - 1, 0, " [%s] | %s | L: %d/%d C: %d-%d",
-		 (e->mode == MODE_NORMAL) ? "NORMAL" : "INSERT", e->path,
-		 e->cy + 1, e->line_count, e->cx + 1,
-		 cx_to_rx(e->current, e->cx) + 1);
+	if (e->message[0] != '\0') {
+		mvprintw(e->screen_rows - 1, 0, "%s", e->message);
 
-	/* Fill the rest with spaces */
+		/* Clear the message immediately so it disappears on next render
+		 */
+		e->message[0] = '\0';
+	} else {
+		mvprintw(e->screen_rows - 1, 0,
+			 " [%s] | %s | L: %d/%d C: %d-%d",
+			 (e->mode == MODE_NORMAL) ? "NORMAL" : "INSERT",
+			 (e->path[0]) ? e->path : "[No Name]", e->cy + 1,
+			 e->line_count, e->cx + 1,
+			 cx_to_rx(e->current, e->cx) + 1);
+	}
+
+	/* Fill the rest of the line with whitespace */
 	int current_x = getcurx(stdscr);
-	for (; current_x < e->screen_cols; current_x++)
+	while (current_x < width) {
 		addch(' ');
+		current_x++;
+	}
 
 	attroff(A_REVERSE);
 }

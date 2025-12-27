@@ -2,6 +2,7 @@
 #define EDITOR_H
 
 #include <limits.h>
+#include <stdarg.h>
 
 #ifndef PATH_MAX
 # define PATH_MAX 4096
@@ -32,29 +33,24 @@ struct line {
 };
 
 struct editor {
-	/*
-	 * TODO: Create buffer system
-	 */
+	/* TODO: Create buffer system */
 	struct line *head;
 	struct line *tail;
 	struct line *current;
 
 	int line_count;
 
-	/*
-	 * Cursor coords
-	 */
+	/* Cursor coords */
 	int cx, cy;
-	/*
-	 * Offsets for rendering
-	 */
+	/* Offsets for rendering */
 	int row_offset;
 	int col_offset;
-	/*
-	 * Terminal properties
-	 */
+	/* Terminal properties */
 	int screen_rows; /* x, getmaxyx */
 	int screen_cols; /* y, getmaxyx */
+
+	/* Status bar message */
+	char message[80];
 
 	char path[PATH_MAX];
 	enum editor_mode mode;
