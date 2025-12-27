@@ -5,6 +5,9 @@
 #include <ncurses.h>
 #include "editor.h"
 
+const char *help_text[] = { "Coming later" };
+int help_line_count = sizeof(help_text) / sizeof(help_text[0]);
+
 /* Sets status bar message */
 static void set_message(struct editor *e, const char *fmt, ...)
 {
@@ -322,6 +325,54 @@ static void insert_char(struct editor *e, int c)
 	e->cx++;
 }
 
+static void show_help_page()
+{
+	int offset = 0; /* Scroll pos */
+	int key;
+
+	while (1) {
+		erase();
+		int rows, cols;
+		getmaxyx(stdscr, rows, cols);
+
+		/* Draw Sticky Title Bar */
+		attron(A_REVERSE);
+		mvhline(0, 0, ' ', cols);
+		char *title = "The manual";
+		/* Center the title text */
+		int title_x = (cols / 2) - (strlen(title) / 2);
+		mvprintw(0, title_x, "%s", title);
+		attroff(A_REVERSE);
+
+		/* Draw Scrollable Content */
+		/* We start drawing from row 1 to leave row 0 for the sticky
+		 * title */
+		for (int i = 0; i < rows - 1; i++) {
+			int line_idx = i + offset;
+			if (line_idx < help_line_count) {
+				mvaddnstr(i + 1, 2, help_text[line_idx],
+					  cols - 4);
+			}
+		}
+
+		refresh();
+
+		/* Handle input */
+		key = getch();
+		if (key == KEY_ESCAPE || key == 'q') {
+			break;
+		} else if (key == KEY_DOWN || key == 'j') {
+			if (offset < help_line_count - (rows - 1))
+				offset++;
+		} else if (key == KEY_UP || key == 'k') {
+			if (offset > 0)
+				offset--;
+		}
+	}
+
+	erase();
+}
+
 static void handle_input(struct editor *e)
 {
 	int c = getch();
@@ -336,6 +387,9 @@ static void handle_input(struct editor *e)
 			break;
 		case 'w':
 			save_file(e);
+			break;
+		case 'H': /* TODO: make long command */
+			show_help_page();
 			break;
 		case KEY_UP:
 		case KEY_DOWN:
