@@ -14,15 +14,18 @@
 	    */
 #define TAB_WIDTH 8
 
+/* Colors,
+ * https://wiki.gentoo.org/wiki/Terminal_emulator/Colors */
+
+#define COLOR_BRIGHT_BLACK 8 /* Gray */
+
 enum editor_mode {
 	MODE_NORMAL,
 	MODE_INSERT,
 };
 
-/*
- * Using simple linked lists for lines, not fancy gap buffers like Emacs or
- * ropes like VS Code
- */
+/* Using simple linked lists for lines, not fancy gap buffers like Emacs or
+ * ropes like VS Code */
 struct line {
 	char *data;
 	int size;
@@ -49,8 +52,11 @@ struct editor {
 	int screen_rows; /* x, getmaxyx */
 	int screen_cols; /* y, getmaxyx */
 
-	/* Status bar message */
+	/* Status bar */
 	char message[80];
+
+	/* Line gutter */
+	int gutter_w;
 
 	char path[PATH_MAX];
 	enum editor_mode mode;

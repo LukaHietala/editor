@@ -185,10 +185,19 @@ static void draw_status_bar(struct editor *e)
 	attroff(A_REVERSE);
 }
 
+static void update_gutter_width(struct editor *e)
+{
+	char buf[32];
+	/* Chars needed for digits + 1 space padding */
+	e->gutter_w = snprintf(buf, sizeof(buf), "%d", e->line_count) + 1;
+}
+
 static void draw_ui(struct editor *e)
 {
 	/* Sets the editor windown dimensions */
 	getmaxyx(stdscr, e->screen_rows, e->screen_cols);
+
+	update_gutter_width(e);
 
 	/* Navigate to the line at row_offset to start drawing */
 	struct line *iter = e->head;
@@ -207,12 +216,18 @@ static void draw_ui(struct editor *e)
 		clrtoeol();
 
 		if (iter != NULL) {
-			int len = iter->size;
+			/* Draw gutter */
+			attron(COLOR_PAIR(1));
+			mvprintw(y, 0, "%*d ", e->gutter_w - 1, iter->lineno);
+			attroff(COLOR_PAIR(1));
+
 			/* Draw a line accounting for current editor column
 			 * offset */
-			if (len > e->col_offset) {
-				mvaddnstr(y, 0, &iter->data[e->col_offset],
-					  e->screen_cols);
+			if (iter->size > e->col_offset) {
+				int max_chars = e->screen_cols - e->gutter_w;
+				mvaddnstr(y, e->gutter_w,
+					  &iter->data[e->col_offset],
+					  max_chars);
 			}
 			iter = iter->next;
 		} else {
@@ -335,7 +350,7 @@ static void show_help_page()
 		int rows, cols;
 		getmaxyx(stdscr, rows, cols);
 
-		/* Draw Sticky Title Bar */
+		/* Draw sticky title bar */
 		attron(A_REVERSE);
 		mvhline(0, 0, ' ', cols);
 		char *title = "The manual";
@@ -344,7 +359,7 @@ static void show_help_page()
 		mvprintw(0, title_x, "%s", title);
 		attroff(A_REVERSE);
 
-		/* Draw Scrollable Content */
+		/* Draw scrollable content */
 		/* We start drawing from row 1 to leave row 0 for the sticky
 		 * title */
 		for (int i = 0; i < rows - 1; i++) {
@@ -454,7 +469,7 @@ static void handle_input(struct editor *e)
 		e->col_offset = rx - e->screen_cols + 1;
 }
 
-static void init_ncurses()
+static void init_ncurses(struct editor *e)
 {
 	/* Initialise ncurses */
 	initscr();
@@ -472,6 +487,18 @@ static void init_ncurses()
 	/* By default Ncurses has delay for ESC. Leftovers from Curses as well
 	 */
 	set_escdelay(0);
+
+	/* Check and init colors, using only 16 bit colors to cover the biggest
+	 * range of terminal emulators. Maybe moving to 256 bit in the future or
+	 * even to TrueColor? And keeping 16 as fallback ofcourse */
+	if (has_colors()) {
+		start_color();
+		/* Gutter pair, gray */
+		init_pair(1, COLOR_BRIGHT_BLACK, COLOR_BLACK);
+	} else {
+		/* Are we in the 1970s */
+		set_message(e, "Warn: No terminal color support");
+	}
 }
 
 int main(int argc, char *argv[])
@@ -488,7 +515,7 @@ int main(int argc, char *argv[])
 	struct editor e = { 0 };
 	e.mode = MODE_NORMAL;
 
-	init_ncurses();
+	init_ncurses(&e);
 	load_file(&e, argv[1]);
 
 	while (1) {
@@ -498,8 +525,7 @@ int main(int argc, char *argv[])
 		/* RX - rendered x, is like CX (cursor x pos), but it's only
 		 * meant for rendering. For example it turns tab (cx = 1) to (rx
 		 * = TAB_WIDTH). TAB_WIDTH is only 8 for now. */
-		move(e.cy - e.row_offset, rx - e.col_offset);
-
+		move(e.cy - e.row_offset, (rx - e.col_offset) + e.gutter_w);
 		refresh();
 		handle_input(&e);
 	}
