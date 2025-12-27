@@ -8,6 +8,7 @@
 #endif
 
 #define KEY_ESCAPE 27
+#define KEY_RETURN 10 /* using LF, ncurses automatically translates 13 to 10. Using nl() */
 #define TAB_WIDTH  8
 
 enum editor_mode {

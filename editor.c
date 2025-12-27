@@ -192,6 +192,7 @@ static void move_cursor(struct editor *e, int key)
 		break;
 	case KEY_DOWN:
 	case 'j':
+	case KEY_RETURN:
 		if (e->current->next) {
 			e->cy++;
 			e->current = e->current->next;
@@ -248,6 +249,7 @@ static void handle_input(struct editor *e)
 		case 'j':
 		case 'k':
 		case 'l':
+		case KEY_RETURN:
 			move_cursor(e, c);
 			break;
 		}
@@ -301,6 +303,8 @@ static void init_ncurses()
 	/* Switch terminal to raw mode so every character goes through
 	 * uninterpreted, instead of generating signals */
 	raw();
+	/* Enable CR -> NL translation */
+	nl();
 	/* Enable capture of special keys (arrows, function keys), so
 	 * handle_input() can read them. Does not include ESC so defined
 	 * seperatly. This due to some historical stuff from Curses */
