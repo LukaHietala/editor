@@ -8,6 +8,65 @@
 const char *help_text[] = { "Coming later" };
 int help_line_count = sizeof(help_text) / sizeof(help_text[0]);
 
+void buffer_append_line(struct buffer *b, char *text, size_t capacity)
+{
+	struct line *node = malloc(sizeof(struct line));
+	if (!node)
+		return;
+
+	node->data = text;
+	node->size = (int)strlen(text);
+	/* TODO: change capacity and size to size_t */
+	node->capacity = (capacity > 0) ? (int)capacity : node->size;
+
+	node->lineno = (b->tail) ? b->tail->lineno + 1 : 1;
+	node->next = NULL;
+	node->prev = b->tail;
+
+	if (b->tail)
+		b->tail->next = node;
+	else
+		b->head = node;
+
+	b->tail = node;
+	b->line_count++;
+
+	if (!b->current)
+		b->current = node;
+}
+
+/* Creates a empty buffer */
+static struct buffer *buffer_new()
+{
+	struct buffer *buf = calloc(1, sizeof(struct buffer));
+	buf->path[0] = '\0';
+
+	buffer_append_line(buf, strdup(""), 0);
+
+	return buf;
+}
+
+/* Free a specific buffer */
+static void buffer_free(struct buffer *b)
+{
+	struct line *iter = b->head;
+	while (iter) {
+		struct line *next = iter->next;
+		if (iter->data)
+			free(iter->data);
+		free(iter);
+		iter = next;
+	}
+	free(b);
+}
+
+/* Switch active buffer */
+static void set_active_buffer(struct editor *e, struct buffer *b)
+{
+	e->active_buf = b;
+	e->mode = MODE_NORMAL;
+}
+
 /* Sets status bar message */
 static void set_message(struct editor *e, const char *fmt, ...)
 {
@@ -17,69 +76,44 @@ static void set_message(struct editor *e, const char *fmt, ...)
 	va_end(ap);
 }
 
-static void free_editor(struct editor *e)
-{
-	struct line *curr = e->head;
-	/* Frees every line */
-	while (curr) {
-		struct line *next = curr->next;
-		if (curr->data)
-			free(curr->data);
-		free(curr);
-		curr = next;
-	}
-}
-
 static void quit_editor(struct editor *e, int status)
 {
 	endwin();
-	free_editor(e);
+	/* Free all buffers */
+	struct buffer *iter = e->buf_head;
+	while (iter) {
+		struct buffer *next = iter->next;
+		buffer_free(iter);
+		iter = next;
+	}
+
 	exit(status);
-}
-
-static void append_line(struct editor *e, char *text)
-{
-	struct line *node = malloc(sizeof(struct line));
-
-	node->data = text;
-	node->size = strlen(text);
-	node->capacity = node->size;
-	node->lineno = (e->tail) ? e->tail->lineno + 1 : 1;
-	node->next = NULL;
-	node->prev = e->tail;
-
-	if (e->tail)
-		e->tail->next = node;
-	else
-		e->head = node;
-
-	e->tail = node;
-	e->line_count++;
-
-	/* If this is the first line, set current to it */
-	if (!e->current)
-		e->current = node;
 }
 
 static void load_file(struct editor *e, const char *path)
 {
-	strncpy(e->path, path, sizeof(e->path) - 1);
+	/* Create new buffer */
+	struct buffer *b = buffer_new();
+	strncpy(b->path, path, sizeof(b->path) - 1);
+
 	FILE *f = fopen(path, "r");
-
-	e->head = NULL;
-	e->tail = NULL;
-	e->current = NULL;
-	e->line_count = 0;
-
 	if (f) {
+		/* Clear the default empty line we created in buffer_new */
+		free(b->head->data);
+		free(b->head);
+		b->head = NULL;
+		b->tail = NULL;
+		b->current = NULL;
+		b->line_count = 0;
+
 		char *line = NULL;
 		size_t cap = 0;
 		ssize_t len;
 
 		while ((len = getline(&line, &cap, f)) != -1) {
-			/* Strip newline/CR */
 			line[strcspn(line, "\r\n")] = '\0';
-			append_line(e, line);
+
+			buffer_append_line(b, line, cap);
 
 			line = NULL;
 			cap = 0;
@@ -88,31 +122,51 @@ static void load_file(struct editor *e, const char *path)
 		fclose(f);
 	}
 
-	/* Make sure editor is never empty */
-	if (e->head == NULL)
-		append_line(e, strdup(""));
+	/* Fallback if file empty */
+	if (b->head == NULL) {
+		struct line *l = malloc(sizeof(struct line));
+		l->data = strdup("");
+		l->size = 0;
+		l->capacity = 0;
+		l->lineno = 1;
+		l->next = NULL;
+		l->prev = NULL;
+		b->head = l;
+		b->tail = l;
+		b->current = l;
+		b->line_count = 1;
+	}
 
-	/* Ensure current and cursor is set to start */
-	e->current = e->head;
-	e->cx = 0;
-	e->cy = 0;
+	/* Link into editor list */
+	if (e->buf_head == NULL) {
+		e->buf_head = b;
+	} else {
+		struct buffer *iter = e->buf_head;
+		while (iter->next)
+			iter = iter->next;
+		iter->next = b;
+		b->prev = iter;
+	}
+
+	/* Set as active */
+	set_active_buffer(e, b);
 }
 
 static void save_file(struct editor *e)
 {
-	if (!e->path[0]) {
+	if (!e->active_buf->path[0]) {
 		/* TODO: Handle "No Name" files later */
 		return;
 	}
 
-	FILE *f = fopen(e->path, "w");
+	FILE *f = fopen(e->active_buf->path, "w");
 	if (!f) {
 		/* Failed to open file (permissions, etc) */
 		set_message(e, "Err: %s", strerror(errno));
 		return;
 	}
 
-	struct line *curr = e->head;
+	struct line *curr = e->active_buf->head;
 	long bytes_written = 0;
 	while (curr) {
 		if (curr->data) {
@@ -135,8 +189,8 @@ static void save_file(struct editor *e)
 	}
 
 	fclose(f);
-	set_message(e, "\"%s\" %ldL, %ldB written", e->path, e->line_count,
-		    bytes_written);
+	set_message(e, "\"%s\" %ldL, %ldB written", e->active_buf->path,
+		    e->active_buf->line_count, bytes_written);
 }
 
 /* Converts real mouse pos to rendered mouse pos */
@@ -170,9 +224,12 @@ static void draw_status_bar(struct editor *e)
 		mvprintw(e->screen_rows - 1, 0,
 			 " [%s] | %s | L: %d/%d C: %d-%d",
 			 (e->mode == MODE_NORMAL) ? "NORMAL" : "INSERT",
-			 (e->path[0]) ? e->path : "[No Name]", e->cy + 1,
-			 e->line_count, e->cx + 1,
-			 cx_to_rx(e->current, e->cx) + 1);
+			 (e->active_buf->path[0]) ? e->active_buf->path :
+						    "[No Name]",
+			 e->active_buf->cy + 1, e->active_buf->line_count,
+			 e->active_buf->cx + 1,
+			 cx_to_rx(e->active_buf->current, e->active_buf->cx) +
+				 1);
 	}
 
 	/* Fill the rest of the line with whitespace */
@@ -189,7 +246,8 @@ static void update_gutter_width(struct editor *e)
 {
 	char buf[32];
 	/* Chars needed for digits + 1 space padding */
-	e->gutter_w = snprintf(buf, sizeof(buf), "%d", e->line_count) + 1;
+	e->active_buf->gutter_w =
+		snprintf(buf, sizeof(buf), "%d", e->active_buf->line_count) + 1;
 }
 
 static void draw_ui(struct editor *e)
@@ -200,11 +258,11 @@ static void draw_ui(struct editor *e)
 	update_gutter_width(e);
 
 	/* Navigate to the line at row_offset to start drawing */
-	struct line *iter = e->head;
+	struct line *iter = e->active_buf->head;
 	int current_row = 0;
 
 	/* Fast forward to row_offset */
-	while (iter != NULL && current_row < e->row_offset) {
+	while (iter != NULL && current_row < e->active_buf->row_offset) {
 		iter = iter->next;
 		current_row++;
 	}
@@ -218,16 +276,19 @@ static void draw_ui(struct editor *e)
 		if (iter != NULL) {
 			/* Draw gutter */
 			attron(COLOR_PAIR(1));
-			mvprintw(y, 0, "%*d ", e->gutter_w - 1, iter->lineno);
+			mvprintw(y, 0, "%*d ", e->active_buf->gutter_w - 1,
+				 iter->lineno);
 			attroff(COLOR_PAIR(1));
 
 			/* Draw a line accounting for current editor column
 			 * offset */
-			if (iter->size > e->col_offset) {
-				int max_chars = e->screen_cols - e->gutter_w;
-				mvaddnstr(y, e->gutter_w,
-					  &iter->data[e->col_offset],
-					  max_chars);
+			if (iter->size > e->active_buf->col_offset) {
+				int max_chars = e->screen_cols -
+						e->active_buf->gutter_w;
+				mvaddnstr(
+					y, e->active_buf->gutter_w,
+					&iter->data[e->active_buf->col_offset],
+					max_chars);
 			}
 			iter = iter->next;
 		} else {
@@ -243,45 +304,46 @@ static void move_cursor(struct editor *e, int key)
 {
 	/* Make sure that there is current line before trying to jump to another
 	 * lines */
-	if (!e->current)
+	if (!e->active_buf->current)
 		return;
 
 	/* Bounds */
-	int row_len = e->current->size;
+	int row_len = e->active_buf->current->size;
 
 	switch (key) {
 	case KEY_LEFT:
 	case 'h':
-		if (e->cx > 0)
-			e->cx--;
+		if (e->active_buf->cx > 0)
+			e->active_buf->cx--;
 		break;
 	case KEY_RIGHT:
 	case 'l':
-		if (e->cx < row_len)
-			e->cx++;
+		if (e->active_buf->cx < row_len)
+			e->active_buf->cx++;
 		break;
 	case KEY_UP:
 	case 'k':
-		if (e->current->prev) {
-			e->cy--;
-			e->current = e->current->prev;
+		if (e->active_buf->current->prev) {
+			e->active_buf->cy--;
+			e->active_buf->current = e->active_buf->current->prev;
 		}
 		break;
 	case KEY_DOWN:
 	case 'j':
 	case KEY_RETURN: /* Keycode 10 and 13 */
-		if (e->current->next) {
-			e->cy++;
-			e->current = e->current->next;
+		if (e->active_buf->current->next) {
+			e->active_buf->cy++;
+			e->active_buf->current = e->active_buf->current->next;
 		}
 		break;
 	case KEY_PPAGE: /* Page up */
 		/* Move up by the number of rows visible on screen, -1 due to
 		 * status bar taking one space, TODO: optimize, use lineos */
 		for (int i = 0; i < e->screen_rows - 1; i++) {
-			if (e->current->prev) {
-				e->cy--;
-				e->current = e->current->prev;
+			if (e->active_buf->current->prev) {
+				e->active_buf->cy--;
+				e->active_buf->current =
+					e->active_buf->current->prev;
 			}
 		}
 		break;
@@ -289,37 +351,38 @@ static void move_cursor(struct editor *e, int key)
 		/* Move down by the number of rows visible on screen, -1 due to
 		 * status bar taking one space, TODO: optimize, use linenos */
 		for (int i = 0; i < e->screen_rows - 1; i++) {
-			if (e->current->next) {
-				e->cy++;
-				e->current = e->current->next;
+			if (e->active_buf->current->next) {
+				e->active_buf->cy++;
+				e->active_buf->current =
+					e->active_buf->current->next;
 			}
 		}
 		break;
 	case 'g': /* Jump to head */
 		/* Check for the second 'g' */
 		if (getch() == 'g') {
-			e->current = e->head;
-			e->cy = 0;
-			e->cx = 0;
+			e->active_buf->current = e->active_buf->head;
+			e->active_buf->cy = 0;
+			e->active_buf->cx = 0;
 		}
 		break;
 
 	case 'G': /* Jump to tail */
-		e->current = e->tail;
-		e->cy = e->line_count - 1;
-		e->cx = 0;
+		e->active_buf->current = e->active_buf->tail;
+		e->active_buf->cy = e->active_buf->line_count - 1;
+		e->active_buf->cx = 0;
 		break;
 	}
 
 	/* Snap cursor to shorter line length */
-	row_len = e->current->size;
-	if (e->cx > row_len)
-		e->cx = row_len;
+	row_len = e->active_buf->current->size;
+	if (e->active_buf->cx > row_len)
+		e->active_buf->cx = row_len;
 }
 
 static void insert_char(struct editor *e, int c)
 {
-	struct line *l = e->current;
+	struct line *l = e->active_buf->current;
 
 	/* Check line capacity and grow it (*2) if necessary */
 	if (l->size >= l->capacity) {
@@ -329,20 +392,21 @@ static void insert_char(struct editor *e, int c)
 
 	/* Move text; if cursor is in middle, shift rest of line right,
 	 * memmove(dest, src, n) */
-	memmove(&l->data[e->cx + 1], &l->data[e->cx], l->size - e->cx);
+	memmove(&l->data[e->active_buf->cx + 1], &l->data[e->active_buf->cx],
+		l->size - e->active_buf->cx);
 
 	/* Insert char and update size */
-	l->data[e->cx] = c;
+	l->data[e->active_buf->cx] = c;
 	l->size++;
 	l->data[l->size] = '\0';
 
 	/* Move cursor */
-	e->cx++;
+	e->active_buf->cx++;
 }
 
 static void insert_newline(struct editor *e)
 {
-	struct line *l = e->current;
+	struct line *l = e->active_buf->current;
 	if (!l)
 		return;
 
@@ -353,14 +417,14 @@ static void insert_newline(struct editor *e)
 
 	/* Handle the text split */
 	/* Everything from cursor to end of string goes to the new line */
-	char *split_data = &l->data[e->cx];
+	char *split_data = &l->data[e->active_buf->cx];
 	new_line->data = strdup(split_data);
 	new_line->size = strlen(new_line->data);
 	new_line->capacity = new_line->size;
 
 	/* Truncate the current line at the cursor position */
-	l->data[e->cx] = '\0';
-	l->size = e->cx;
+	l->data[e->active_buf->cx] = '\0';
+	l->size = e->active_buf->cx;
 
 	/* Shrink memory of the old line to fit the new shorter string, this is
 	 * not really necessary but optimizes mem usage a little */
@@ -379,15 +443,15 @@ static void insert_newline(struct editor *e)
 	} else {
 		/* If we were at the end of the file, new_line is the new tail
 		 */
-		e->tail = new_line;
+		e->active_buf->tail = new_line;
 	}
 	l->next = new_line;
 
 	/* Update Editor State */
-	e->current = new_line;
-	e->cy++;
-	e->cx = 0;
-	e->line_count++;
+	e->active_buf->current = new_line;
+	e->active_buf->cy++;
+	e->active_buf->cx = 0;
+	e->active_buf->line_count++;
 
 	/* Iterate and update lineos after newline*/
 	struct line *iter = new_line;
@@ -399,16 +463,16 @@ static void insert_newline(struct editor *e)
 
 static void delete_char(struct editor *e, int backspace)
 {
-	struct line *l = e->current;
+	struct line *l = e->active_buf->current;
 
 	/* Move cursor left first, then delete */
 	if (backspace) {
 		/* If at the very start of the file, do nothing */
-		if (e->cx == 0 && e->cy == 0)
+		if (e->active_buf->cx == 0 && e->active_buf->cy == 0)
 			return;
 
-		if (e->cx > 0) {
-			e->cx--;
+		if (e->active_buf->cx > 0) {
+			e->active_buf->cx--;
 		} else {
 			/* Join with previous line */
 			struct line *prev = l->prev;
@@ -430,13 +494,13 @@ static void delete_char(struct editor *e, int backspace)
 			if (l->next)
 				l->next->prev = prev;
 			else
-				e->tail = prev;
+				e->active_buf->tail = prev;
 
 			/* Update editor */
-			e->current = prev;
-			e->cy--;
-			e->cx = old_prev_size;
-			e->line_count--;
+			e->active_buf->current = prev;
+			e->active_buf->cy--;
+			e->active_buf->cx = old_prev_size;
+			e->active_buf->line_count--;
 
 			free(l->data);
 			free(l);
@@ -454,7 +518,7 @@ static void delete_char(struct editor *e, int backspace)
 
 	/* If cursor is at the very end of the line, there is nothing to delete
 	 */
-	if (e->cx == l->size) {
+	if (e->active_buf->cx == l->size) {
 		/* Join current line with next */
 		if (l->next) {
 			struct line *next = l->next;
@@ -471,9 +535,9 @@ static void delete_char(struct editor *e, int backspace)
 			if (next->next)
 				next->next->prev = l;
 			else
-				e->tail = l;
+				e->active_buf->tail = l;
 
-			e->line_count--;
+			e->active_buf->line_count--;
 
 			free(next->data);
 			free(next);
@@ -489,7 +553,8 @@ static void delete_char(struct editor *e, int backspace)
 	}
 
 	/* Shift everything after the cursor one position to the left */
-	memmove(&l->data[e->cx], &l->data[e->cx + 1], l->size - e->cx);
+	memmove(&l->data[e->active_buf->cx], &l->data[e->active_buf->cx + 1],
+		l->size - e->active_buf->cx);
 
 	l->size--;
 	l->data[l->size] = '\0';
@@ -578,6 +643,14 @@ static void handle_input(struct editor *e)
 		case KEY_NPAGE:
 			move_cursor(e, c);
 			break;
+		case ']': /* Next buffer */
+			if (e->active_buf->next)
+				set_active_buffer(e, e->active_buf->next);
+			break;
+		case '[': /* Prev buffer */
+			if (e->active_buf->prev)
+				set_active_buffer(e, e->active_buf->prev);
+			break;
 		}
 	} else { /* MODE_INSERT */
 		switch (c) {
@@ -612,21 +685,21 @@ static void handle_input(struct editor *e)
 	int h_limit = e->screen_rows - 1;
 
 	/* Row scrolling */
-	if (e->cy < e->row_offset)
-		e->row_offset = e->cy;
-	if (e->cy >= e->row_offset + h_limit)
-		e->row_offset = e->cy - h_limit + 1;
+	if (e->active_buf->cy < e->active_buf->row_offset)
+		e->active_buf->row_offset = e->active_buf->cy;
+	if (e->active_buf->cy >= e->active_buf->row_offset + h_limit)
+		e->active_buf->row_offset = e->active_buf->cy - h_limit + 1;
 
 	/*
 	 * Col scrolling
 	 * TODO: Some padding, like opt.scrolloff in vim
 	 */
-	int rx = cx_to_rx(e->current, e->cx);
+	int rx = cx_to_rx(e->active_buf->current, e->active_buf->cx);
 
-	if (rx < e->col_offset)
-		e->col_offset = rx;
-	if (rx >= e->col_offset + e->screen_cols)
-		e->col_offset = rx - e->screen_cols + 1;
+	if (rx < e->active_buf->col_offset)
+		e->active_buf->col_offset = rx;
+	if (rx >= e->active_buf->col_offset + e->screen_cols)
+		e->active_buf->col_offset = rx - e->screen_cols + 1;
 }
 
 static void init_ncurses(struct editor *e)
@@ -663,29 +736,30 @@ static void init_ncurses(struct editor *e)
 
 int main(int argc, char *argv[])
 {
-	/*
-	 * TODO: If not provided open a empty buffer and when writing take the
-	 * filename as input.
-	 */
-	if (argc < 2) {
-		printf("Usage: %s <filename>\n", argv[0]);
-		return 1;
-	}
-
 	struct editor e = { 0 };
 	e.mode = MODE_NORMAL;
 
 	init_ncurses(&e);
-	load_file(&e, argv[1]);
+	if (argc >= 2) {
+		/* Load all provided files */
+		for (int i = 1; i < argc; i++)
+			load_file(&e, argv[i]);
+	} else {
+		/* No file provided? Create a "No Name" buffer */
+		struct buffer *b = buffer_new();
+		e.buf_head = b;
+		set_active_buffer(&e, b);
+	}
 
 	while (1) {
 		draw_ui(&e);
 
-		int rx = cx_to_rx(e.current, e.cx);
+		int rx = cx_to_rx(e.active_buf->current, e.active_buf->cx);
 		/* RX - rendered x, is like CX (cursor x pos), but it's only
 		 * meant for rendering. For example it turns tab (cx = 1) to (rx
 		 * = TAB_WIDTH). TAB_WIDTH is only 8 for now. */
-		move(e.cy - e.row_offset, (rx - e.col_offset) + e.gutter_w);
+		move(e.active_buf->cy - e.active_buf->row_offset,
+		     (rx - e.active_buf->col_offset) + e.active_buf->gutter_w);
 		refresh();
 		handle_input(&e);
 	}
