@@ -340,6 +340,34 @@ static void insert_char(struct editor *e, int c)
 	e->cx++;
 }
 
+static void delete_char(struct editor *e, int backspace)
+{
+	struct line *l = e->current;
+
+	/* Move cursor left first, then delete */
+	if (backspace) {
+		if (e->cx > 0) {
+			e->cx--;
+		} else {
+			/* TODO: Handle joining with previous line */
+			return;
+		}
+	}
+
+	/* If cursor is at the very end of the line, there is nothing to delete
+	 */
+	if (e->cx == l->size) {
+		/* TODO: Handle joining with next line */
+		return;
+	}
+
+	/* Shift everything after the cursor one position to the left */
+	memmove(&l->data[e->cx], &l->data[e->cx + 1], l->size - e->cx);
+
+	l->size--;
+	l->data[l->size] = '\0';
+}
+
 static void show_help_page()
 {
 	int offset = 0; /* Scroll pos */
@@ -438,8 +466,10 @@ static void handle_input(struct editor *e)
 			move_cursor(e, c);
 			break;
 		case KEY_BACKSPACE:
-		case KEY_DL:
-			/* TODO: Char deletion */
+			delete_char(e, 1); /* 1 means backspace */
+			break;
+		case KEY_DC:
+			delete_char(e, 0); /* 0 means DEL */
 			break;
 		default:
 			if (c >= 32 && c <= 126)
