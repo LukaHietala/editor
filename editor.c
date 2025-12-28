@@ -403,10 +403,51 @@ static void delete_char(struct editor *e, int backspace)
 
 	/* Move cursor left first, then delete */
 	if (backspace) {
+		/* If at the very start of the file, do nothing */
+		if (e->cx == 0 && e->cy == 0)
+			return;
+
 		if (e->cx > 0) {
 			e->cx--;
 		} else {
-			/* TODO: Handle joining with previous line */
+			/* Join with previous line */
+			struct line *prev = l->prev;
+			/* Save old prev line size */
+			int old_prev_size = prev->size;
+			/* Reallocate previous line to fit current line's data
+			 */
+			prev->data =
+				realloc(prev->data, prev->size + l->size + 1);
+			memcpy(&prev->data[prev->size], l->data, l->size);
+
+			/* Make sure prev line is updated */
+			prev->size += l->size;
+			prev->data[prev->size] = '\0';
+			prev->capacity = prev->size;
+
+			/* Update linked list pointers */
+			prev->next = l->next;
+			if (l->next)
+				l->next->prev = prev;
+			else
+				e->tail = prev;
+
+			/* Update editor */
+			e->current = prev;
+			e->cy--;
+			e->cx = old_prev_size;
+			e->line_count--;
+
+			free(l->data);
+			free(l);
+
+			/* Update all linenos */
+			struct line *iter = prev->next;
+			while (iter) {
+				iter->lineno--;
+				iter = iter->next;
+			}
+
 			return;
 		}
 	}
@@ -414,7 +455,36 @@ static void delete_char(struct editor *e, int backspace)
 	/* If cursor is at the very end of the line, there is nothing to delete
 	 */
 	if (e->cx == l->size) {
-		/* TODO: Handle joining with next line */
+		/* Join current line with next */
+		if (l->next) {
+			struct line *next = l->next;
+
+			/* Create space for merged line */
+			l->data = realloc(l->data, l->size + next->size + 1);
+			memcpy(&l->data[l->size], next->data, next->size);
+			l->size += next->size;
+			l->data[l->size] = '\0';
+			l->capacity = l->size;
+
+			/* Update linked list */
+			l->next = next->next;
+			if (next->next)
+				next->next->prev = l;
+			else
+				e->tail = l;
+
+			e->line_count--;
+
+			free(next->data);
+			free(next);
+
+			/* Update lineos */
+			struct line *iter = l->next;
+			while (iter) {
+				iter->lineno--;
+				iter = iter->next;
+			}
+		}
 		return;
 	}
 
