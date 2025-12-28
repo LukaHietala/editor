@@ -82,4 +82,20 @@ struct editor {
 	enum editor_mode mode;
 };
 
+/* Prototypes */
+void buffer_free(struct buffer *b);
+struct buffer *buffer_new();
+int cx_to_rx(struct line *l, int cx);
+void delete_char(struct editor *e, int backspace);
+void draw_ui(struct editor *e);
+void handle_input(struct editor *e);
+void insert_char(struct editor *e, int c);
+void insert_newline(struct editor *e);
+void load_file(struct editor *e, const char *path);
+void quit_editor(struct editor *e, int status);
+void save_file(struct editor *e);
+void set_active_buffer(struct editor *e, struct buffer *b);
+void set_message(struct editor *e, const char *fmt, ...);
+void show_help_page();
+
 #endif
