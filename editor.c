@@ -340,6 +340,63 @@ static void insert_char(struct editor *e, int c)
 	e->cx++;
 }
 
+static void insert_newline(struct editor *e)
+{
+	struct line *l = e->current;
+	if (!l)
+		return;
+
+	/* Allocate space for new line */
+	struct line *new_line = malloc(sizeof(struct line));
+	if (!new_line)
+		return;
+
+	/* Handle the text split */
+	/* Everything from cursor to end of string goes to the new line */
+	char *split_data = &l->data[e->cx];
+	new_line->data = strdup(split_data);
+	new_line->size = strlen(new_line->data);
+	new_line->capacity = new_line->size;
+
+	/* Truncate the current line at the cursor position */
+	l->data[e->cx] = '\0';
+	l->size = e->cx;
+
+	/* Shrink memory of the old line to fit the new shorter string, this is
+	 * not really necessary but optimizes mem usage a little */
+	char *tmp = realloc(l->data, l->size + 1);
+	if (tmp) {
+		l->data = tmp;
+		l->capacity = l->size;
+	}
+
+	/* Insert new_line into the doubly linked list */
+	new_line->prev = l;
+	new_line->next = l->next;
+
+	if (l->next) {
+		l->next->prev = new_line;
+	} else {
+		/* If we were at the end of the file, new_line is the new tail
+		 */
+		e->tail = new_line;
+	}
+	l->next = new_line;
+
+	/* Update Editor State */
+	e->current = new_line;
+	e->cy++;
+	e->cx = 0;
+	e->line_count++;
+
+	/* Iterate and update lineos after newline*/
+	struct line *iter = new_line;
+	while (iter) {
+		iter->lineno = iter->prev->lineno + 1;
+		iter = iter->next;
+	}
+}
+
 static void delete_char(struct editor *e, int backspace)
 {
 	struct line *l = e->current;
@@ -470,6 +527,9 @@ static void handle_input(struct editor *e)
 			break;
 		case KEY_DC:
 			delete_char(e, 0); /* 0 means DEL */
+			break;
+		case KEY_RETURN:
+			insert_newline(e);
 			break;
 		default:
 			if (c >= 32 && c <= 126)
