@@ -131,6 +131,9 @@ void handle_input(struct editor *e)
 		case 'E': /* Open explorer */
 			open_explorer(e, ".");
 			break;
+		case 'K':
+			open_man_page(e);
+			break;
 		}
 	} else { /* MODE_INSERT */
 		switch (c) {
