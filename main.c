@@ -72,8 +72,11 @@ int main(int argc, char *argv[])
 		/* RX - rendered x, is like CX (cursor x pos), but it's only
 		 * meant for rendering. For example it turns tab (cx = 1) to (rx
 		 * = TAB_WIDTH). TAB_WIDTH is only 8 for now. */
-		move(e.active_buf->cy - e.active_buf->row_offset,
-		     (rx - e.active_buf->col_offset) + e.active_buf->gutter_w);
+		/* Ensure screen_x accounts for gutter and scroll, but never
+		 * enters gutter space */
+		int screen_x = (rx - e.active_buf->col_offset) +
+			       e.active_buf->gutter_w;
+		move(e.active_buf->cy - e.active_buf->row_offset, screen_x);
 		refresh();
 		handle_input(&e);
 	}
