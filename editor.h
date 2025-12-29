@@ -25,6 +25,7 @@
 enum editor_mode {
 	MODE_NORMAL,
 	MODE_INSERT,
+	MODE_EXPLORER,
 };
 
 struct line {
@@ -79,6 +80,13 @@ struct editor {
 	/* Status bar message, 80 bytes is resonable for most terminals */
 	char message[80];
 
+	/* Explorer state */
+	struct dirent **file_list;
+	int file_count;
+	int expl_cy;
+	int expl_offset;
+	char cwd[PATH_MAX];
+
 	enum editor_mode mode;
 };
 
@@ -97,5 +105,8 @@ void save_file(struct editor *e);
 void set_active_buffer(struct editor *e, struct buffer *b);
 void set_message(struct editor *e, const char *fmt, ...);
 void show_help_page();
+void handle_explorer_input(struct editor *e);
+void open_explorer(struct editor *e, const char *path);
+void draw_explorer(struct editor *e);
 
 #endif

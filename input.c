@@ -83,6 +83,10 @@ static void move_cursor(struct editor *e, int key)
 
 void handle_input(struct editor *e)
 {
+	if (e->mode == MODE_EXPLORER) {
+		handle_explorer_input(e);
+		return;
+	}
 	int c = getch();
 
 	if (e->mode == MODE_NORMAL) {
@@ -123,6 +127,9 @@ void handle_input(struct editor *e)
 		case '[': /* Prev buffer */
 			if (e->active_buf->prev)
 				set_active_buffer(e, e->active_buf->prev);
+			break;
+		case 'E': /* Open explorer */
+			open_explorer(e, ".");
 			break;
 		}
 	} else { /* MODE_INSERT */

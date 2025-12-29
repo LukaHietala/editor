@@ -65,6 +65,15 @@ void set_active_buffer(struct editor *e, struct buffer *b)
 
 void load_file(struct editor *e, const char *path)
 {
+	/* Check if the buffer already exist */
+	struct buffer *existing = e->buf_head;
+	while (existing) {
+		if (strcmp(existing->path, path) == 0) {
+			set_active_buffer(e, existing);
+			return;
+		}
+		existing = existing->next;
+	}
 	/* Create new buffer */
 	struct buffer *b = buffer_new();
 	strncpy(b->path, path, sizeof(b->path) - 1);

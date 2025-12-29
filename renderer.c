@@ -74,6 +74,12 @@ void draw_ui(struct editor *e)
 {
 	/* Sets the editor windown dimensions */
 	getmaxyx(stdscr, e->screen_rows, e->screen_cols);
+
+	if (e->mode == MODE_EXPLORER) {
+		draw_explorer(e);
+		return;
+	}
+
 	update_gutter_width(e);
 
 	/* Navigate to the line at row_offset to start drawing */
