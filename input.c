@@ -158,7 +158,7 @@ void handle_input(struct editor *e)
 			insert_newline(e);
 			break;
 		default:
-			if (c >= 32 && c <= 126)
+			if ((c >= 32 && c <= 126) || c == 9)
 				insert_char(e, c);
 			break;
 		}
