@@ -1,4 +1,4 @@
-#include <ncurses.h>
+﻿#include <ncurses.h>
 #include <stdlib.h>
 #include "editor.h"
 
@@ -40,6 +40,7 @@ static void init_ncurses(struct editor *e)
 	 * even to TrueColor? And keeping 16 as fallback ofcourse */
 	if (has_colors()) {
 		start_color();
+		use_default_colors();
 		/* Gutter pair, gray */
 		init_pair(1, COLOR_BRIGHT_BLACK, COLOR_BLACK);
 	} else {
