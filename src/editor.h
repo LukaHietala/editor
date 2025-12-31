@@ -109,5 +109,6 @@ void handle_explorer_input(struct editor *e);
 void open_explorer(struct editor *e, const char *path);
 void draw_explorer(struct editor *e);
 void open_man_page(struct editor *e);
+void init_ncurses(struct editor *e);
 
 #endif
