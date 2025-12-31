@@ -17,6 +17,28 @@ static void to_last_line(struct editor *e)
 	e->active_buf->cx = 0;
 }
 
+/* Move cursor up by one page */
+static void page_up(struct editor *e)
+{
+	for (int i = 0; i < e->screen_rows - 1; i++) {
+		if (e->active_buf->current->prev) {
+			e->active_buf->cy--;
+			e->active_buf->current = e->active_buf->current->prev;
+		}
+	}
+}
+
+/* Move cursor down by one page */
+static void page_down(struct editor *e)
+{
+	for (int i = 0; i < e->screen_rows - 1; i++) {
+		if (e->active_buf->current->next) {
+			e->active_buf->cy++;
+			e->active_buf->current = e->active_buf->current->next;
+		}
+	}
+}
+
 static void move_cursor(struct editor *e, int key)
 {
 	/* Make sure that there is current line before trying to jump to another
@@ -54,26 +76,10 @@ static void move_cursor(struct editor *e, int key)
 		}
 		break;
 	case KEY_PPAGE: /* Page up */
-		/* Move up by the number of rows visible on screen, -1 due to
-		 * status bar taking one space, TODO: optimize, use lineos */
-		for (int i = 0; i < e->screen_rows - 1; i++) {
-			if (e->active_buf->current->prev) {
-				e->active_buf->cy--;
-				e->active_buf->current =
-					e->active_buf->current->prev;
-			}
-		}
+		page_up(e);
 		break;
 	case KEY_NPAGE: /* Page down */
-		/* Move down by the number of rows visible on screen, -1 due to
-		 * status bar taking one space, TODO: optimize, use linenos */
-		for (int i = 0; i < e->screen_rows - 1; i++) {
-			if (e->active_buf->current->next) {
-				e->active_buf->cy++;
-				e->active_buf->current =
-					e->active_buf->current->next;
-			}
-		}
+		page_down(e);
 		break;
 	case 'g': /* Jump to head */
 		/* Wait for second 'g' */
