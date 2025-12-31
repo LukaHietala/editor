@@ -3,10 +3,10 @@ CFLAGS = -Wall -g $(shell pkg-config --cflags ncurses)
 LDLIBS = $(shell pkg-config --libs ncurses)
 
 BUILD_DIR = build
-TARGET = $(BUILD_DIR)/editor
+TARGET = $(BUILD_DIR)/kiuru
 
-SRCS = main.c buffer.c renderer.c input.c help.c explorer.c manual.c util.c
-OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
+SRCS = src/main.c src/buffer.c src/renderer.c src/input.c src/help.c src/explorer.c src/manual.c src/util.c
+OBJS = $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
 
 all: $(TARGET)
 
@@ -15,7 +15,7 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LDLIBS)
 	@echo "Ready: $(TARGET)"
 
-$(BUILD_DIR)/%.o: %.c editor.h
+$(BUILD_DIR)/%.o: src/%.c src/editor.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
