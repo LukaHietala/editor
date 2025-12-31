@@ -1,6 +1,22 @@
 #include <ncurses.h>
 #include "editor.h"
 
+/* Sets cursor to buffer head */
+static void to_first_line(struct editor *e)
+{
+	e->active_buf->current = e->active_buf->head;
+	e->active_buf->cy = 0;
+	e->active_buf->cx = 0;
+}
+
+/* Sets cursor to buffer tail */
+static void to_last_line(struct editor *e)
+{
+	e->active_buf->current = e->active_buf->tail;
+	e->active_buf->cy = e->active_buf->line_count - 1;
+	e->active_buf->cx = 0;
+}
+
 static void move_cursor(struct editor *e, int key)
 {
 	/* Make sure that there is current line before trying to jump to another
@@ -60,18 +76,13 @@ static void move_cursor(struct editor *e, int key)
 		}
 		break;
 	case 'g': /* Jump to head */
-		/* Check for the second 'g' */
-		if (getch() == 'g') {
-			e->active_buf->current = e->active_buf->head;
-			e->active_buf->cy = 0;
-			e->active_buf->cx = 0;
-		}
+		/* Wait for second 'g' */
+		if (getch() == 'g')
+			to_first_line(e);
 		break;
 
 	case 'G': /* Jump to tail */
-		e->active_buf->current = e->active_buf->tail;
-		e->active_buf->cy = e->active_buf->line_count - 1;
-		e->active_buf->cx = 0;
+		to_last_line(e);
 		break;
 	}
 
