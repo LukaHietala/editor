@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "editor.h"
+#include "util.h"
 
 /* Recalculate line numbers starting from a specific line */
 static void recalculate_linenos(struct line *start_node, int start_num)
@@ -28,15 +29,13 @@ static void line_free(struct line *l)
 /* Creates a empty buffer */
 struct buffer *buffer_new(void)
 {
-	struct buffer *buf = calloc(1, sizeof(struct buffer));
-	if (!buf)
-		return NULL;
+	struct buffer *buf = xcalloc(1, sizeof(struct buffer));
 
 	buf->path[0] = '\0';
 
 	/* Initialize with one empty line */
-	struct line *l = calloc(1, sizeof(struct line));
-	l->data = strdup("");
+	struct line *l = xcalloc(1, sizeof(struct line));
+	l->data = safe_strdup("");
 	l->size = 0;
 	l->capacity = 0;
 	l->lineno = 1;
@@ -105,9 +104,9 @@ void load_file(struct editor *e, const char *path)
 			}
 
 			/* Create new line node */
-			struct line *l = calloc(1, sizeof(struct line));
-			l->data = strdup(
-				line_buf); /* strdup is safer than taking
+			struct line *l = xcalloc(1, sizeof(struct line));
+			l->data = safe_strdup(
+				line_buf); /* safe_strdup is safer than taking
 					      ownership of getline buffer */
 			l->size = (size_t)len;
 			l->capacity = l->size;
@@ -130,8 +129,8 @@ void load_file(struct editor *e, const char *path)
 	if (b->line_count == 0) {
 		/* buffer_new logic handles the struct, but we cleared it above,
 		 * so re-add */
-		struct line *l = calloc(1, sizeof(struct line));
-		l->data = strdup("");
+		struct line *l = xcalloc(1, sizeof(struct line));
+		l->data = safe_strdup("");
 		l->lineno = 1;
 		b->head = b->tail = l;
 		b->line_count = 1;
@@ -198,12 +197,7 @@ void insert_char(struct editor *e, int c)
 	/* Grow capacity if needed */
 	if (l->size + 1 >= l->capacity) {
 		size_t new_cap = (l->capacity == 0) ? 16 : l->capacity * 2;
-		char *new_data = realloc(l->data, new_cap);
-		if (!new_data)
-			return; /* Allocation failed, TODO: make safe_realloc to
-				   always handle this*/
-
-		l->data = new_data;
+		l->data = xrealloc(l->data, new_cap);
 		l->capacity = new_cap;
 	}
 
@@ -226,12 +220,10 @@ void insert_newline(struct editor *e)
 	if (!l)
 		return;
 
-	struct line *new_line = calloc(1, sizeof(struct line));
-	if (!new_line)
-		return;
+	struct line *new_line = xcalloc(1, sizeof(struct line));
 
 	/* Split text: Copy from cursor to end into new line */
-	new_line->data = strdup(&l->data[b->cx]);
+	new_line->data = safe_strdup(&l->data[b->cx]);
 	new_line->size = strlen(new_line->data);
 	new_line->capacity = new_line->size + 1; /* +1 for safety/null */
 
@@ -275,10 +267,7 @@ void delete_char(struct editor *e, int backspace)
 		size_t old_prev_len = prev->size;
 
 		/* Grow prev buffer to hold current line's data */
-		char *new_data = realloc(prev->data, prev->size + l->size + 1);
-		if (!new_data)
-			return;
-		prev->data = new_data;
+		prev->data = xrealloc(prev->data, prev->size + l->size + 1);
 		prev->capacity = prev->size + l->size + 1;
 
 		/* Append current line data to prev */
@@ -313,9 +302,7 @@ void delete_char(struct editor *e, int backspace)
 		struct line *next = l->next;
 
 		/* Grow current buffer to hold next line's data */
-		char *new_data = realloc(l->data, l->size + next->size + 1);
-		if (!new_data)
-			return;
+		char *new_data = xrealloc(l->data, l->size + next->size + 1);
 		l->data = new_data;
 		l->capacity = l->size + next->size + 1;
 

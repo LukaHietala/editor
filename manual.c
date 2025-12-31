@@ -3,6 +3,7 @@
 #include <ncurses.h>
 #include <string.h>
 #include "editor.h"
+#include "util.h"
 
 static int is_word_char(char c)
 {
@@ -34,11 +35,9 @@ static char *get_word_under_cursor(struct editor *e)
 	if (len <= 0)
 		return NULL;
 
-	char *word = malloc(len + 1);
-	if (word) {
-		memcpy(word, &l->data[start], len);
-		word[len] = '\0';
-	}
+	char *word = xmalloc(len + 1);
+	memcpy(word, &l->data[start], len);
+	word[len] = '\0';
 	return word;
 }
 

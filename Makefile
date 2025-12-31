@@ -5,7 +5,7 @@ LDLIBS = $(shell pkg-config --libs ncurses)
 BUILD_DIR = build
 TARGET = $(BUILD_DIR)/editor
 
-SRCS = main.c buffer.c renderer.c input.c help.c explorer.c manual.c
+SRCS = main.c buffer.c renderer.c input.c help.c explorer.c manual.c util.c
 OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
 
 all: $(TARGET)
