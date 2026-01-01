@@ -1,5 +1,5 @@
 #include <ncurses.h>
-#include "editor.h"
+#include "kiuru.h"
 
 /* Sets cursor to buffer head */
 static void to_first_line(struct editor *e)
@@ -98,6 +98,85 @@ static void move_cursor(struct editor *e, int key)
 		e->active_buf->cx = row_len;
 }
 
+static void handle_normal_mode(struct editor *e, int c)
+{
+	switch (c) {
+	case 'i':
+		e->mode = MODE_INSERT;
+		break;
+	case 'q':
+		quit_editor(e, 0);
+		break;
+	case 'w':
+		save_file(e);
+		break;
+	case 'H': /* TODO: make long command */
+		show_help_page();
+		break;
+	case KEY_UP:
+	case KEY_DOWN:
+	case KEY_LEFT:
+	case KEY_RIGHT:
+	case 'h':
+	case 'j':
+	case 'k':
+	case 'l':
+	/* gg - Jump to head */
+	case 'g':
+	/* Jump to tail */
+	case 'G':
+	case KEY_RETURN:
+	case KEY_PPAGE:
+	case KEY_NPAGE:
+		move_cursor(e, c);
+		break;
+	case ']': /* Next buffer */
+		if (e->active_buf->next)
+			set_active_buffer(e, e->active_buf->next);
+		break;
+	case '[': /* Prev buffer */
+		if (e->active_buf->prev)
+			set_active_buffer(e, e->active_buf->prev);
+		break;
+	case 'E': /* Open explorer */
+		open_explorer(e, ".");
+		break;
+	case 'K':
+		open_man_page(e);
+		break;
+	}
+}
+
+static void handle_insert_mode(struct editor *e, int c)
+{
+	switch (c) {
+	case KEY_ESCAPE:
+		e->mode = MODE_NORMAL;
+		break;
+	case KEY_UP:
+	case KEY_DOWN:
+	case KEY_LEFT:
+	case KEY_RIGHT:
+	case KEY_PPAGE:
+	case KEY_NPAGE:
+		move_cursor(e, c);
+		break;
+	case KEY_BACKSPACE:
+		delete_char(e, 1); /* 1 means backspace */
+		break;
+	case KEY_DC:
+		delete_char(e, 0); /* 0 means DEL */
+		break;
+	case KEY_RETURN:
+		insert_newline(e);
+		break;
+	default:
+		if ((c >= 32 && c <= 126) || c == 9)
+			insert_char(e, c);
+		break;
+	}
+}
+
 void handle_input(struct editor *e)
 {
 	if (e->mode == MODE_EXPLORER) {
@@ -106,80 +185,10 @@ void handle_input(struct editor *e)
 	}
 	int c = getch();
 
-	if (e->mode == MODE_NORMAL) {
-		switch (c) {
-		case 'i':
-			e->mode = MODE_INSERT;
-			break;
-		case 'q':
-			quit_editor(e, 0);
-			break;
-		case 'w':
-			save_file(e);
-			break;
-		case 'H': /* TODO: make long command */
-			show_help_page();
-			break;
-		case KEY_UP:
-		case KEY_DOWN:
-		case KEY_LEFT:
-		case KEY_RIGHT:
-		case 'h':
-		case 'j':
-		case 'k':
-		case 'l':
-		/* gg - Jump to head */
-		case 'g':
-		/* Jump to tail */
-		case 'G':
-		case KEY_RETURN:
-		case KEY_PPAGE:
-		case KEY_NPAGE:
-			move_cursor(e, c);
-			break;
-		case ']': /* Next buffer */
-			if (e->active_buf->next)
-				set_active_buffer(e, e->active_buf->next);
-			break;
-		case '[': /* Prev buffer */
-			if (e->active_buf->prev)
-				set_active_buffer(e, e->active_buf->prev);
-			break;
-		case 'E': /* Open explorer */
-			open_explorer(e, ".");
-			break;
-		case 'K':
-			open_man_page(e);
-			break;
-		}
-	} else { /* MODE_INSERT */
-		switch (c) {
-		case KEY_ESCAPE:
-			e->mode = MODE_NORMAL;
-			break;
-		case KEY_UP:
-		case KEY_DOWN:
-		case KEY_LEFT:
-		case KEY_RIGHT:
-		case KEY_PPAGE:
-		case KEY_NPAGE:
-			move_cursor(e, c);
-			break;
-		case KEY_BACKSPACE:
-			delete_char(e, 1); /* 1 means backspace */
-			break;
-		case KEY_DC:
-			delete_char(e, 0); /* 0 means DEL */
-			break;
-		case KEY_RETURN:
-			insert_newline(e);
-			break;
-		default:
-			if ((c >= 32 && c <= 126) || c == 9)
-				insert_char(e, c);
-			break;
-		}
-	}
+	if (e->mode == MODE_NORMAL)
+		handle_normal_mode(e, c);
+	else
+		handle_insert_mode(e, c);
 
 	/* Reserve space for status bar */
 	int h_limit = e->screen_rows - 1;

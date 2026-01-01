@@ -1,33 +1,6 @@
 #include <ncurses.h>
 #include <stdio.h>
-#include "editor.h"
-
-/* Converts real mouse pos to rendered mouse pos */
-int cx_to_rx(struct line *line, int cx)
-{
-	if (!line)
-		return 0;
-	int rx = 0;
-	for (int i = 0; i < cx && i < line->size; i++) {
-		if (line->data[i] == '\t') {
-			/* Tab stops are always multiples of TAB_WIDTH relative
-			 to the text start, gutter wifth is accounted for */
-			rx += TAB_WIDTH - (rx % TAB_WIDTH);
-		} else {
-			rx++;
-		}
-	}
-	return rx;
-}
-
-/* Sets status bar message */
-void set_message(struct editor *e, const char *fmt, ...)
-{
-	va_list ap;
-	va_start(ap, fmt);
-	vsnprintf(e->message, sizeof(e->message), fmt, ap);
-	va_end(ap);
-}
+#include "kiuru.h"
 
 static void draw_status_bar(struct editor *e)
 {

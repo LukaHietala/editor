@@ -1,6 +1,6 @@
 ﻿#include <ncurses.h>
 #include <stdlib.h>
-#include "editor.h"
+#include "kiuru.h"
 
 void quit_editor(struct editor *e, int status)
 {

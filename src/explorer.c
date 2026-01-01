@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "editor.h"
+#include "kiuru.h"
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>

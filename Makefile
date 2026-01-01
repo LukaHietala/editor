@@ -5,7 +5,7 @@ LDLIBS = $(shell pkg-config --libs ncurses)
 BUILD_DIR = build
 TARGET = $(BUILD_DIR)/kiuru
 
-SRCS = src/main.c src/buffer.c src/renderer.c src/input.c src/help.c src/explorer.c src/manual.c src/util.c
+SRCS = $(wildcard src/*.c)
 OBJS = $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
 
 all: $(TARGET)
@@ -15,7 +15,7 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LDLIBS)
 	@echo "Ready: $(TARGET)"
 
-$(BUILD_DIR)/%.o: src/%.c src/editor.h
+$(BUILD_DIR)/%.o: src/%.c src/kiuru.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 

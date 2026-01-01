@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "editor.h"
+#include "kiuru.h"
 #include "util.h"
 
 /* Recalculate line numbers starting from a specific line */
@@ -35,7 +35,7 @@ struct buffer *buffer_new(void)
 
 	/* Initialize with one empty line */
 	struct line *l = xcalloc(1, sizeof(struct line));
-	l->data = safe_strdup("");
+	l->data = xstrdup("");
 	l->size = 0;
 	l->capacity = 0;
 	l->lineno = 1;
@@ -105,8 +105,8 @@ void load_file(struct editor *e, const char *path)
 
 			/* Create new line node */
 			struct line *l = xcalloc(1, sizeof(struct line));
-			l->data = safe_strdup(
-				line_buf); /* safe_strdup is safer than taking
+			l->data = xstrdup(
+				line_buf); /* xstrdup is safer than taking
 					      ownership of getline buffer */
 			l->size = (size_t)len;
 			l->capacity = l->size;
@@ -130,7 +130,7 @@ void load_file(struct editor *e, const char *path)
 		/* buffer_new logic handles the struct, but we cleared it above,
 		 * so re-add */
 		struct line *l = xcalloc(1, sizeof(struct line));
-		l->data = safe_strdup("");
+		l->data = xstrdup("");
 		l->lineno = 1;
 		b->head = b->tail = l;
 		b->line_count = 1;
@@ -223,7 +223,7 @@ void insert_newline(struct editor *e)
 	struct line *new_line = xcalloc(1, sizeof(struct line));
 
 	/* Split text: Copy from cursor to end into new line */
-	new_line->data = safe_strdup(&l->data[b->cx]);
+	new_line->data = xstrdup(&l->data[b->cx]);
 	new_line->size = strlen(new_line->data);
 	new_line->capacity = new_line->size + 1; /* +1 for safety/null */
 

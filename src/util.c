@@ -2,6 +2,68 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <ctype.h>
+#include "kiuru.h"
+#include "util.h"
+
+/* Converts real mouse pos to rendered mouse pos */
+int cx_to_rx(struct line *line, int cx)
+{
+	if (!line)
+		return 0;
+	int rx = 0;
+	for (int i = 0; i < cx && i < line->size; i++)
+		if (line->data[i] == '\t')
+			rx += TAB_WIDTH - (rx % TAB_WIDTH);
+		else
+			rx++;
+	return rx;
+}
+
+/* Sets status bar message */
+void set_message(struct editor *e, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(e->message, sizeof(e->message), fmt, ap);
+	va_end(ap);
+}
+
+static int is_word_char(char c)
+{
+	return isalnum(c) || c == '_';
+}
+
+char *get_word_under_cursor(struct editor *e)
+{
+	struct line *l = e->active_buf->current;
+	if (!l || l->size == 0)
+		return NULL;
+
+	int cx = e->active_buf->cx;
+	/* If cursor is at the end of the line (on the \0), move back one */
+	if (cx >= l->size && cx > 0)
+		cx--;
+
+	/* Find start of word */
+	int start = cx;
+	while (start > 0 && is_word_char(l->data[start - 1]))
+		start--;
+
+	/* Find end of word */
+	int end = cx;
+	while (end < l->size && is_word_char(l->data[end]))
+		end++;
+
+	int len = end - start;
+	if (len <= 0)
+		return NULL;
+
+	char *word = xmalloc(len + 1);
+	memcpy(word, &l->data[start], len);
+	word[len] = '\0';
+	return word;
+}
 
 void die(const char *err, ...)
 {
@@ -38,7 +100,7 @@ void *xrealloc(void *ptr, size_t size)
 	return new_ptr;
 }
 
-char *safe_strdup(const char *s)
+char *xstrdup(const char *s)
 {
 	if (!s)
 		return NULL;

@@ -1,44 +1,59 @@
-#include <ctype.h>
-#include <stdlib.h>
 #include <ncurses.h>
 #include <string.h>
-#include "editor.h"
+#include <ctype.h>
+#include <stdlib.h>
+#include "kiuru.h"
 #include "util.h"
 
-static int is_word_char(char c)
+static const char *help_text[] = { "Coming later" };
+static const int help_line_count = sizeof(help_text) / sizeof(help_text[0]);
+
+void show_help_page()
 {
-	return isalnum(c) || c == '_';
-}
+	int offset = 0; /* Scroll pos */
+	int key;
 
-static char *get_word_under_cursor(struct editor *e)
-{
-	struct line *l = e->active_buf->current;
-	if (!l || l->size == 0)
-		return NULL;
+	while (1) {
+		erase();
+		int rows, cols;
+		getmaxyx(stdscr, rows, cols);
 
-	int cx = e->active_buf->cx;
-	/* If cursor is at the end of the line (on the \0), move back one */
-	if (cx >= l->size && cx > 0)
-		cx--;
+		/* Draw sticky title bar */
+		attron(A_REVERSE);
+		mvhline(0, 0, ' ', cols);
+		char *title = "The manual";
+		/* Center the title text */
+		int title_x = (cols / 2) - (strlen(title) / 2);
+		mvprintw(0, title_x, "%s", title);
+		attroff(A_REVERSE);
 
-	/* Find start of word */
-	int start = cx;
-	while (start > 0 && is_word_char(l->data[start - 1]))
-		start--;
+		/* Draw scrollable content */
+		/* We start drawing from row 1 to leave row 0 for the sticky
+		 * title */
+		for (int i = 0; i < rows - 1; i++) {
+			int line_idx = i + offset;
+			if (line_idx < help_line_count) {
+				mvaddnstr(i + 1, 2, help_text[line_idx],
+					  cols - 4);
+			}
+		}
 
-	/* Find end of word */
-	int end = cx;
-	while (end < l->size && is_word_char(l->data[end]))
-		end++;
+		refresh();
 
-	int len = end - start;
-	if (len <= 0)
-		return NULL;
+		/* Handle input */
+		key = getch();
+		if (key == KEY_ESCAPE || key == 'q') {
+			break;
+		} else if (key == KEY_DOWN || key == 'j') {
+			if (offset < help_line_count - (rows - 1))
+				offset++;
+		} else if (key == KEY_UP || key == 'k') {
+			if (offset > 0)
+				offset--;
+		}
+	}
 
-	char *word = xmalloc(len + 1);
-	memcpy(word, &l->data[start], len);
-	word[len] = '\0';
-	return word;
+	erase();
 }
 
 void open_man_page(struct editor *e)
